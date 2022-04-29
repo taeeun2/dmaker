@@ -1,12 +1,15 @@
 package com.fastcampus.programming.dmaker.service;
 
+import com.fastcampus.programming.dmaker.code.StatusCode;
 import com.fastcampus.programming.dmaker.dto.CreateDeveloper;
 import com.fastcampus.programming.dmaker.dto.DeveloperDetailDto;
 import com.fastcampus.programming.dmaker.dto.DeveloperDto;
 import com.fastcampus.programming.dmaker.dto.EditDeveloper;
 import com.fastcampus.programming.dmaker.entity.Developer;
+import com.fastcampus.programming.dmaker.entity.RetiredDeveloper;
 import com.fastcampus.programming.dmaker.exception.DMakerException;
 import com.fastcampus.programming.dmaker.repository.DeveloperRepository;
+import com.fastcampus.programming.dmaker.repository.RetiredDeveloperRepository;
 import com.fastcampus.programming.dmaker.type.DeveloperLevel;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,8 @@ import static com.fastcampus.programming.dmaker.exception.DMakerErrorCode.*;
 public class DMakerService {
     //DI(의존성 주입)
     private final DeveloperRepository developerRepository;
+    private final RetiredDeveloperRepository retiredDeveloperRepository;
+
 
     @Transactional
     public CreateDeveloper.Response createDeveloper(CreateDeveloper.@Valid Request request){
@@ -36,6 +41,7 @@ public class DMakerService {
                 .name(request.getName())
                 .age(request.getAge())
                 .memberId(request.getMemberId())
+                .statusCode(StatusCode.EMPLOYED)
                 .build();
         developerRepository.save(developer);
 
@@ -57,8 +63,8 @@ public class DMakerService {
 
     }
 
-    public List<DeveloperDto> getAllDevelopers() {
-        return developerRepository.findAll()
+    public List<DeveloperDto> getAllEmployedDevelopers() {
+        return developerRepository.findDevelopersByStatusCodeEquals(StatusCode.EMPLOYED)
                 .stream().map(DeveloperDto::fromEntity)
                 .collect(Collectors.toList());
     }
@@ -102,5 +108,21 @@ public class DMakerService {
         if(developerLevel == DeveloperLevel.JUNIOR && experienceYears > 4  ){
             throw new DMakerException(LEVEL_EXPERIENCE_YEAR_NOT_MATCHED);
         }
+    }
+
+    @Transactional // db의 값들을 변경해줄 때 되도록 붙여준다.
+    public DeveloperDetailDto deleteDeveloper(String memberId) {
+        //1. EMPLOYED -> RETIRED
+        Developer developer = developerRepository.findByMemberId(memberId)
+                .orElseThrow(()-> new DMakerException(NO_DEVELOPER));
+        developer.setStatusCode(StatusCode.RETIRED);
+        //2. save into RetiredDeveloper
+        RetiredDeveloper retiredDeveloper = RetiredDeveloper.builder()
+                .memberId(memberId)
+                .name(developer.getName())
+                .build();
+        retiredDeveloperRepository.save(retiredDeveloper);
+        return DeveloperDetailDto.fromEntity(developer);
+
     }
 }
