@@ -10,17 +10,16 @@ import com.fastcampus.programming.dmaker.entity.RetiredDeveloper;
 import com.fastcampus.programming.dmaker.exception.DMakerException;
 import com.fastcampus.programming.dmaker.repository.DeveloperRepository;
 import com.fastcampus.programming.dmaker.repository.RetiredDeveloperRepository;
-import com.fastcampus.programming.dmaker.type.DeveloperLevel;
+import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-
-import javax.transaction.Transactional;
-import javax.validation.Valid;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static com.fastcampus.programming.dmaker.exception.DMakerErrorCode.*;
+import static com.fastcampus.programming.dmaker.exception.DMakerErrorCode.DUPLICATED_MEMBER_ID;
+import static com.fastcampus.programming.dmaker.exception.DMakerErrorCode.NO_DEVELOPER;
 
 @Service
 @RequiredArgsConstructor//기본 생성자를 자동으로 만들어줌
@@ -31,10 +30,19 @@ public class DMakerService {
 
 
     @Transactional
-    public CreateDeveloper.Response createDeveloper(CreateDeveloper.@Valid Request request){
+    public CreateDeveloper.Response createDeveloper(CreateDeveloper.Request request){
 
         validateCreateDeveloperRequest(request);
-        Developer developer = Developer.builder()
+
+        return CreateDeveloper.Response
+                .fromEntity(
+                        developerRepository.save
+                                (createDeveloperFromRequest(request))
+                );
+    }
+
+    public static Developer createDeveloperFromRequest(CreateDeveloper.Request request){
+        return Developer.builder()
                 .developerLevel(request.getDeveloperLevel())
                 .developerSkillType(request.getDeveloperSkillType())
                 .experienceYears(request.getExperienceYears())
@@ -43,18 +51,12 @@ public class DMakerService {
                 .memberId(request.getMemberId())
                 .statusCode(StatusCode.EMPLOYED)
                 .build();
-        developerRepository.save(developer);
-
-        return CreateDeveloper.Response.fromEntity(developer);
     }
-
-    private void validateCreateDeveloperRequest(CreateDeveloper.Request request) {
+    private void validateCreateDeveloperRequest(@NonNull CreateDeveloper.Request request) {
         //business validation
 
-        validateDeveloperLevel(
-                request.getDeveloperLevel(),
-                request.getExperienceYears()
-        );
+        request.getDeveloperLevel()
+                .validateExperienceYears(request.getExperienceYears());
 
         developerRepository.findByMemberId(request.getMemberId())
                 .ifPresent((developer ->{
@@ -63,58 +65,52 @@ public class DMakerService {
 
     }
 
+    @Transactional(readOnly = true)
     public List<DeveloperDto> getAllEmployedDevelopers() {
         return developerRepository.findDevelopersByStatusCodeEquals(StatusCode.EMPLOYED)
                 .stream().map(DeveloperDto::fromEntity)
                 .collect(Collectors.toList());
     }
-
+    @Transactional(readOnly = true)
     public DeveloperDetailDto getDeveloperDetail(String memberId) {
-        return developerRepository.findByMemberId(memberId)
-                .map(DeveloperDetailDto::fromEntity)
-                .orElseThrow(()-> new DMakerException(NO_DEVELOPER));
+            return DeveloperDetailDto.fromEntity(getDeveloperByMemberId(memberId));
 
     }
 
+    private Developer getDeveloperByMemberId(String memberId){
+        return developerRepository.findByMemberId(memberId)
+                .orElseThrow(()-> new DMakerException(NO_DEVELOPER));
+    }
     @Transactional // 변경되는 사항들을 commit이 되도록 하기 위해 필요
     public DeveloperDetailDto editDeveloper(String memberId, EditDeveloper.Request request) {
-        validateEditDeveloperRequest(request, memberId);
 
-        Developer developer =  developerRepository.findByMemberId(memberId)
-                .orElseThrow(()->new DMakerException(NO_DEVELOPER));
+        request.getDeveloperLevel()
+                .validateExperienceYears(request.getExperienceYears());
 
+        return DeveloperDetailDto.fromEntity(
+                getUpdatedDeveloperFromRequest(
+                        request,
+                        getDeveloperByMemberId(memberId)
+                )
+        );
+
+    }
+
+    private Developer getUpdatedDeveloperFromRequest(EditDeveloper.Request request, Developer developer) {
         developer.setDeveloperLevel(request.getDeveloperLevel());
         developer.setDeveloperSkillType(request.getDeveloperSkillType());
         developer.setExperienceYears(request.getExperienceYears());
-
-        return DeveloperDetailDto.fromEntity(developer);
-
+        return developer;
     }
 
-    private void validateEditDeveloperRequest(EditDeveloper.Request request, String memberId) {
-        validateDeveloperLevel(
-                request.getDeveloperLevel(),
-                request.getExperienceYears()
-        );
 
 
-    }
-
-    private void validateDeveloperLevel(DeveloperLevel developerLevel, Integer experienceYears) {
-        if(developerLevel == DeveloperLevel.SENIOR && experienceYears < 10){
-            throw new DMakerException(LEVEL_EXPERIENCE_YEAR_NOT_MATCHED);
-        }
-
-        if(developerLevel == DeveloperLevel.JUNIOR && experienceYears > 4  ){
-            throw new DMakerException(LEVEL_EXPERIENCE_YEAR_NOT_MATCHED);
-        }
-    }
 
     @Transactional // db의 값들을 변경해줄 때 되도록 붙여준다.
     public DeveloperDetailDto deleteDeveloper(String memberId) {
         //1. EMPLOYED -> RETIRED
-        Developer developer = developerRepository.findByMemberId(memberId)
-                .orElseThrow(()-> new DMakerException(NO_DEVELOPER));
+        Developer developer = getDeveloperByMemberId(memberId);
+
         developer.setStatusCode(StatusCode.RETIRED);
         //2. save into RetiredDeveloper
         RetiredDeveloper retiredDeveloper = RetiredDeveloper.builder()

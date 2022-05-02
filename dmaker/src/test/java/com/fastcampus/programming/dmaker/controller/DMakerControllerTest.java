@@ -2,7 +2,6 @@ package com.fastcampus.programming.dmaker.controller;
 
 import com.fastcampus.programming.dmaker.dto.DeveloperDto;
 import com.fastcampus.programming.dmaker.service.DMakerService;
-import com.fastcampus.programming.dmaker.type.DeveloperSkillType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -10,16 +9,15 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.awt.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import static org.hamcrest.CoreMatchers.is;
+
 import static com.fastcampus.programming.dmaker.type.DeveloperLevel.JUNIOR;
 import static com.fastcampus.programming.dmaker.type.DeveloperLevel.SENIOR;
 import static com.fastcampus.programming.dmaker.type.DeveloperSkillType.BACK_END;
 import static com.fastcampus.programming.dmaker.type.DeveloperSkillType.FRONT_END;
+import static org.hamcrest.CoreMatchers.is;
 import static org.mockito.BDDMockito.given;
-
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;

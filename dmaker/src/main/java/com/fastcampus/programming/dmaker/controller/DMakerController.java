@@ -28,7 +28,7 @@ public class DMakerController {
     }
 
     @GetMapping("/developers/{memberId}")
-    public DeveloperDetailDto getDeveloperDetail(@PathVariable String memberId){
+    public DeveloperDetailDto getDeveloperDetail(@PathVariable final String memberId){
         // GET /developers HTTP/1.1
         log.info("GET /developers HTTP/1.1");
 
